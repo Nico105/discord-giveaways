@@ -40,6 +40,7 @@ class GiveawaysManager extends EventEmitter {
          * @type {Giveaway[]}
          */
         this.giveaways = [];
+        this.check = true;
         /**
          * The manager options
          * @type {GiveawaysManagerOptions}
@@ -454,7 +455,8 @@ class GiveawaysManager extends EventEmitter {
      */
     _checkGiveaway() {
         if (this.giveaways.length <= 0) return;
-        this.giveaways.forEach(async (giveaway) => {
+        this.check = false;
+        Promise.allSettled(this.giveaways.map(async (giveaway) => {
             if (giveaway.ended) {
                 if (
                     !isNaN(this.options.endedGiveawaysLifetime) && typeof this.options.endedGiveawaysLifetime === 'number' &&
@@ -485,7 +487,7 @@ class GiveawaysManager extends EventEmitter {
             const embed = this.generateMainEmbed(giveaway, giveaway.lastChance.enabled && giveaway.remainingTime < giveaway.lastChance.threshold);
             giveaway.message.edit({ content: giveaway.messages.giveaway, embeds: [embed] }).catch(() => {});
             if (giveaway.remainingTime < this.options.updateCountdownEvery) {
-                setTimeout(() => this.end.call(this, giveaway.messageId), giveaway.remainingTime);
+                setTimeout(() => this.end.call(this, giveaway.messageId).catch(() => {}), giveaway.remainingTime);
             }
             if (giveaway.lastChance.enabled && (giveaway.remainingTime - giveaway.lastChance.threshold) < this.options.updateCountdownEvery) {
                 setTimeout(() => {
@@ -493,7 +495,7 @@ class GiveawaysManager extends EventEmitter {
                     giveaway.message.edit({ content: giveaway.messages.giveaway, embeds: [embed] }).catch(() => {});
                 }, giveaway.remainingTime - giveaway.lastChance.threshold);
             }
-        });
+        })).then(() => this.check = true);
     }
 
     /**
@@ -536,7 +538,7 @@ class GiveawaysManager extends EventEmitter {
         const rawGiveaways = await this.getAllGiveaways();
         rawGiveaways.forEach((giveaway) => this.giveaways.push(new Giveaway(this, giveaway)));
         setInterval(() => {
-            if (this.client.readyAt) this._checkGiveaway.call(this);
+            if (this.client.readyAt && this.check) this._checkGiveaway.call(this);
         }, this.options.updateCountdownEvery);
         this.ready = true;
 
