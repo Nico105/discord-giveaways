@@ -508,7 +508,7 @@ class Giveaway extends EventEmitter {
      */
     end() {
         if (this.ended) return Promise.reject('Giveaway with message Id ' + this.messageId + ' is already ended');
-        this.ended = true;
+        Object.defineProperty(this, 'ended', { value: true, enumerable: true, writable: true });
 
         return new Promise(async (resolve, reject) => {
             await this.fetchMessage().catch(() => {});

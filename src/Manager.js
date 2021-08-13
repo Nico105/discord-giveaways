@@ -467,7 +467,12 @@ class GiveawaysManager extends EventEmitter {
                 }
                 return;
             }
-            if (giveaway.remainingTime <= 0) return this.end(giveaway.messageId).catch(() => {});
+            if (giveaway.remainingTime <= 0) {
+                this.giveaways = this.giveaways.filter((g) => g.messageId !== giveaway.messageId);
+                this.end(giveaway.messageId).catch(() => {});
+                this.giveaways.push(giveaway);
+                return;
+            }
             await giveaway.fetchMessage().catch(() => {});
             if (!giveaway.message) return;
             if (giveaway.pauseOptions.isPaused) {
@@ -487,7 +492,11 @@ class GiveawaysManager extends EventEmitter {
             const embed = this.generateMainEmbed(giveaway, giveaway.lastChance.enabled && giveaway.remainingTime < giveaway.lastChance.threshold);
             giveaway.message.edit({ content: giveaway.messages.giveaway, embeds: [embed] }).catch(() => {});
             if (giveaway.remainingTime < this.options.updateCountdownEvery) {
-                setTimeout(() => this.end.call(this, giveaway.messageId).catch(() => {}), giveaway.remainingTime);
+                setTimeout(() => {
+                    this.giveaways = this.giveaways.filter((g) => g.messageId !== giveaway.messageId);
+                    this.end.call(this, giveaway.messageId).catch(() => {});
+                    this.giveaways.push(giveaway);
+                }, giveaway.remainingTime);
             }
             if (giveaway.lastChance.enabled && (giveaway.remainingTime - giveaway.lastChance.threshold) < this.options.updateCountdownEvery) {
                 setTimeout(() => {
