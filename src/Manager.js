@@ -164,10 +164,12 @@ class GiveawaysManager extends EventEmitter {
         return new Promise(async (resolve, reject) => {
             const giveaway = this.giveaways.find((g) => g.messageId === messageId);
             if (!giveaway) return reject('No giveaway found with message Id ' + messageId + '.');
+            this.giveaways = this.giveaways.filter((g) => g.messageId !== messageId);
 
             giveaway
                 .end()
                 .then((winners) => {
+                    this.giveaways.push(giveaway);
                     this.emit('giveawayEnded', giveaway, winners);
                     resolve(winners);
                 })
@@ -468,9 +470,7 @@ class GiveawaysManager extends EventEmitter {
                 return;
             }
             if (giveaway.remainingTime <= 0) {
-                this.giveaways = this.giveaways.filter((g) => g.messageId !== giveaway.messageId);
-                this.end(giveaway.messageId).catch(() => {});
-                this.giveaways.push(giveaway);
+                this.end(giveaway.messageId).catch((e) => { console.log(e); });
                 return;
             }
             await giveaway.fetchMessage().catch(() => {});
@@ -493,9 +493,7 @@ class GiveawaysManager extends EventEmitter {
             giveaway.message.edit({ content: giveaway.messages.giveaway, embeds: [embed] }).catch(() => {});
             if (giveaway.remainingTime < this.options.updateCountdownEvery) {
                 setTimeout(() => {
-                    this.giveaways = this.giveaways.filter((g) => g.messageId !== giveaway.messageId);
-                    this.end.call(this, giveaway.messageId).catch(() => {});
-                    this.giveaways.push(giveaway);
+                    this.end.call(this, giveaway.messageId).catch((e) => { console.log(e); });
                 }, giveaway.remainingTime);
             }
             if (giveaway.lastChance.enabled && (giveaway.remainingTime - giveaway.lastChance.threshold) < this.options.updateCountdownEvery) {
