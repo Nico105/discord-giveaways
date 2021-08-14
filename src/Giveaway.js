@@ -507,10 +507,9 @@ class Giveaway extends EventEmitter {
      * @returns {Promise<Discord.GuildMember[]>} The winner(s).
      */
     end() {
-        if (this.ended) return Promise.reject('Giveaway with message Id ' + this.messageId + ' is already ended');
-        Object.defineProperty(this, 'ended', { value: true, enumerable: true, writable: true });
-
         return new Promise(async (resolve, reject) => {
+            if (this.ended) return reject('Giveaway with message Id ' + this.messageId + ' is already ended');
+            this.ended = true;
             await this.fetchMessage().catch(() => {});
             if (!this.message) {
                 this.ended = false;

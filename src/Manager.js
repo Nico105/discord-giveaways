@@ -40,7 +40,6 @@ class GiveawaysManager extends EventEmitter {
          * @type {Giveaway[]}
          */
         this.giveaways = [];
-        this.check = true;
         /**
          * The manager options
          * @type {GiveawaysManagerOptions}
@@ -272,10 +271,12 @@ class GiveawaysManager extends EventEmitter {
         return new Promise(async (resolve, reject) => {
             const giveaway = this.giveaways.find((g) => g.messageId === messageId);
             if (!giveaway) return reject('No giveaway found with message Id ' + messageId + '.');
+            this.giveaways = this.giveaways.filter((g) => g.messageId !== messageId);
 
             giveaway
                 .reroll(options)
                 .then((winners) => {
+                    this.giveaways.push(giveaway);
                     this.emit('giveawayRerolled', giveaway, winners);
                     resolve(winners);
                 })
@@ -455,8 +456,7 @@ class GiveawaysManager extends EventEmitter {
      */
     _checkGiveaway() {
         if (this.giveaways.length <= 0) return;
-        this.check = false;
-        Promise.allSettled(this.giveaways.map(async (giveaway) => {
+        this.giveaways.forEach(async (giveaway) => {
             if (giveaway.ended) {
                 if (
                     !isNaN(this.options.endedGiveawaysLifetime) && typeof this.options.endedGiveawaysLifetime === 'number' &&
@@ -500,7 +500,7 @@ class GiveawaysManager extends EventEmitter {
                     giveaway.message.edit({ content: giveaway.messages.giveaway, embeds: [embed] }).catch(() => {});
                 }, giveaway.remainingTime - giveaway.lastChance.threshold);
             }
-        })).then(() => this.check = true);
+        });
     }
 
     /**
@@ -543,7 +543,7 @@ class GiveawaysManager extends EventEmitter {
         const rawGiveaways = await this.getAllGiveaways();
         rawGiveaways.forEach((giveaway) => this.giveaways.push(new Giveaway(this, giveaway)));
         setInterval(() => {
-            if (this.client.readyAt && this.check) this._checkGiveaway.call(this);
+            if (this.client.readyAt) this._checkGiveaway.call(this);
         }, this.options.updateCountdownEvery);
         this.ready = true;
 
