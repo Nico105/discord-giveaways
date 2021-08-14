@@ -44,6 +44,7 @@ class GiveawaysManager extends EventEmitter {
          * The manager options
          * @type {GiveawaysManagerOptions}
          */
+        this.check = true;
         this.options = merge(GiveawaysManagerOptions, options || {});
         if (init) this._init();
     }
@@ -459,7 +460,8 @@ class GiveawaysManager extends EventEmitter {
      */
     _checkGiveaway() {
         if (this.giveaways.length <= 0) return;
-        this.giveaways.forEach(async (giveaway) => {
+        this.check = false;
+        Promise.allSettled(this.giveaways.map(async (giveaway) => {
             if (giveaway.ended) {
                 if (
                     !isNaN(this.options.endedGiveawaysLifetime) && typeof this.options.endedGiveawaysLifetime === 'number' &&
@@ -503,7 +505,7 @@ class GiveawaysManager extends EventEmitter {
                     giveaway.message.edit({ content: giveaway.messages.giveaway, embeds: [embed] }).catch(() => {});
                 }, giveaway.remainingTime - giveaway.lastChance.threshold);
             }
-        });
+        })).then(() => this.check = true);
     }
 
     /**
@@ -546,7 +548,7 @@ class GiveawaysManager extends EventEmitter {
         const rawGiveaways = await this.getAllGiveaways();
         rawGiveaways.forEach((giveaway) => this.giveaways.push(new Giveaway(this, giveaway)));
         setInterval(() => {
-            if (this.client.readyAt) this._checkGiveaway.call(this);
+            if (this.client.readyAt && this.check) this._checkGiveaway.call(this);
         }, this.options.updateCountdownEvery);
         this.ready = true;
 
