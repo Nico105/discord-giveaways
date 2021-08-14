@@ -164,12 +164,10 @@ class GiveawaysManager extends EventEmitter {
         return new Promise(async (resolve, reject) => {
             const giveaway = this.giveaways.find((g) => g.messageId === messageId);
             if (!giveaway) return reject('No giveaway found with message Id ' + messageId + '.');
-            this.giveaways = this.giveaways.filter((g) => g.messageId !== messageId);
 
             giveaway
                 .end()
                 .then((winners) => {
-                    this.giveaways.push(giveaway);
                     this.emit('giveawayEnded', giveaway, winners);
                     resolve(winners);
                 })
