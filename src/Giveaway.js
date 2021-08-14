@@ -408,7 +408,7 @@ class Giveaway extends EventEmitter {
         if (!reaction) return [];
         const guild = this.message.guild;
         // Fetch guild members
-        if (new Discord.Intents(this.client.options.intents).has('GUILD_MEMBERS')) await guild.members.fetch();
+        if (new Discord.Intents(this.client.options.intents).has('GUILD_MEMBERS')) await guild.members.fetch().catch(() => {});
 
         // Fetch all reaction users
         let userCollection = await reaction.users.fetch();
