@@ -322,6 +322,10 @@ class Giveaway extends EventEmitter {
                 !this.options.bonusEntries || typeof this.options.bonusEntries === 'string'
                     ? this.options.bonusEntries || undefined
                     : serialize(this.options.bonusEntries),
+            endCondition:
+                !this.options.endCondition || typeof this.options.endCondition === 'string'
+                    ? this.options.endCondition || undefined
+                    : serialize(this.options.endCondition),
             reaction: this.options.reaction,
             winnerIds: this.winnerIds.length ? this.winnerIds : undefined,
             extraData: this.extraData,
@@ -647,6 +651,18 @@ class Giveaway extends EventEmitter {
     }
 
     /**
+     * The endCondition function of the giveaway.
+     * @type {?Function}
+     */
+    get endConditionFunction() {
+        return this.options.endCondition
+            ? typeof this.options.endCondition === 'string' && this.options.endCondition.includes('function anonymous')
+                ? eval(`(${this.options.endCondition})`)
+                : eval(this.options.endCondition)
+            : null;
+    }
+
+    /**
      * Ends the giveaway.
      * @param {string|MessageObject} [noWinnerMessage=null] Sent in the channel if there is no valid winner for the giveaway.
      * @returns {Promise<Discord.GuildMember[]>} The winner(s).
@@ -663,6 +679,33 @@ class Giveaway extends EventEmitter {
             if (this.isDrop || this.endAt < this.client.readyTimestamp) this.endAt = Date.now();
             await this.manager.editGiveaway(this.messageId, this.data);
             const winners = await this.roll();
+
+            if (!this.isDrop && typeof this.endConditionFunction === 'function') {
+                try {
+                    const conditionResult = await this.endConditionFunction(this);
+                    if (!isNaN(conditionResult) && typeof conditionResult === 'number') {
+                        this.endAt = this.endAt + conditionResult;
+                        this.ended = false;
+                        await this.manager.editGiveaway(this.messageId, this.data);
+                        return reject(
+                            'Giveaway with message Id ' +
+                                this.messageId +
+                                ' could not end because of its end condition.'
+                        );
+                    }
+                    if (conditionResult !== true) {
+                        console.error(
+                            `Giveaway message Id: ${this.messageId}\n${serialize(
+                                this.endConditionFunction
+                            )}\nThe returned value is neither "true" nor a number.`
+                        );
+                    }
+                } catch (err) {
+                    console.error(
+                        `Giveaway message Id: ${this.messageId}\n${serialize(this.endConditionFunction)}\n${err}`
+                    );
+                }
+            }
 
             const channel =
                 this.message.channel.isThread() && !this.message.channel.sendable
