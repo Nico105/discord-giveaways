@@ -432,9 +432,11 @@ class Giveaway extends EventEmitter {
             let tryLater = true;
             const channel = await this.client.channels.fetch(this.channelId).catch((err) => {
                 if (err.code === 10003) tryLater = false;
+                this.manager.emit('debug', 'Error from "client.channels.fetch()" in "fetchMessage().', err, this);
             });
             const message = await channel?.messages.fetch(this.messageId).catch((err) => {
                 if (err.code === 10008) tryLater = false;
+                this.manager.emit('debug', 'Error from "channel.messages.fetch()" in "fetchMessage().', err, this);
             });
             if (!message) {
                 if (!tryLater) {
@@ -461,11 +463,20 @@ class Giveaway extends EventEmitter {
             const reaction = this.messageReaction;
             if (!reaction) return reject('Unable to find the giveaway reaction.');
 
-            let userCollection = await reaction.users.fetch().catch(() => {});
+            let userCollection = await reaction.users.fetch().catch((err) => {
+                this.manager.emit('debug', 'Error from "reaction.users.fetch()" in "fetchAllEntrants()".', err, this);
+            });
             if (!userCollection) return reject('Unable to fetch the reaction users.');
 
             while (userCollection.size % 100 === 0) {
-                const newUsers = await reaction.users.fetch({ after: userCollection.lastKey() });
+                const newUsers = await reaction.users.fetch({ after: userCollection.lastKey() }).catch((err) => {
+                    this.manager.emit(
+                        'debug',
+                        'Error from "reaction.users.fetch()" with "after" option in "fetchAllEntrants()".',
+                        err,
+                        this
+                    );
+                });
                 if (newUsers.size === 0) break;
                 userCollection = userCollection.concat(newUsers);
             }
@@ -541,7 +552,10 @@ class Giveaway extends EventEmitter {
         if (new Discord.Intents(this.client.options.intents).has(Discord.Intents.FLAGS.GUILD_MEMBERS)) {
             // Try to fetch the guild from the client if the guild instance of the message does not have its shard defined
             if (this.client.shard && !guild.shard) {
-                guild = (await this.client.guilds.fetch(guild.id).catch(() => {})) ?? guild;
+                guild =
+                    (await this.client.guilds.fetch(guild.id).catch((err) => {
+                        this.manager.emit('debug', 'Error from "client.guilds.fetch()" in "roll()".', err, this);
+                    })) ?? guild;
                 // "Update" the message instance too, if possible.
                 this.message = (await this.fetchMessage().catch(() => {})) ?? this.message;
             }
@@ -650,7 +664,9 @@ class Giveaway extends EventEmitter {
                         embeds: [embed],
                         allowedMentions: this.allowedMentions
                     })
-                    .catch(() => {});
+                    .catch((err) => {
+                        this.manager.emit('debug', 'Error from "message.edit()" in "edit()".', err, this);
+                    });
             }
             resolve(this);
         });
@@ -694,7 +710,9 @@ class Giveaway extends EventEmitter {
                             embeds: [embed],
                             allowedMentions: this.allowedMentions
                         })
-                        .catch(() => {});
+                        .catch((err) => {
+                            this.manager.emit('debug', 'Error from "message.edit()" in "end()".', err, this);
+                        });
                 } while (
                     this.message &&
                     !embed.equals(this.message.embeds[0]) &&
@@ -736,7 +754,9 @@ class Giveaway extends EventEmitter {
                                     failIfNotExists: false
                                 }
                             })
-                            .catch(() => {});
+                            .catch((err) => {
+                                this.manager.emit('debug', 'Error from "channel.send()" in "end()".', err, this);
+                            });
                     }
                     while (formattedWinners.length >= 2000) {
                         await channel
@@ -744,14 +764,18 @@ class Giveaway extends EventEmitter {
                                 content: formattedWinners.slice(0, formattedWinners.lastIndexOf(',', 1999)) + ',',
                                 allowedMentions: this.allowedMentions
                             })
-                            .catch(() => {});
+                            .catch((err) => {
+                                this.manager.emit('debug', 'Error from "channel.send()" in "end()".', err, this);
+                            });
                         formattedWinners = formattedWinners.slice(
                             formattedWinners.slice(0, formattedWinners.lastIndexOf(',', 1999) + 2).length
                         );
                     }
                     await channel
                         .send({ content: formattedWinners, allowedMentions: this.allowedMentions })
-                        .catch(() => {});
+                        .catch((err) => {
+                            this.manager.emit('debug', 'Error from "channel.send()" in "end()".', err, this);
+                        });
 
                     const lastContentPart = winMessage.slice(winMessage.indexOf('{winners}') + 9);
                     if (lastContentPart.length) {
@@ -764,7 +788,9 @@ class Giveaway extends EventEmitter {
                                         : components,
                                 allowedMentions: this.allowedMentions
                             })
-                            .catch(() => {});
+                            .catch((err) => {
+                                this.manager.emit('debug', 'Error from "channel.send()" in "end()".', err, this);
+                            });
                     }
                 }
 
@@ -789,7 +815,9 @@ class Giveaway extends EventEmitter {
                                     failIfNotExists: false
                                 }
                             })
-                            .catch(() => {});
+                            .catch((err) => {
+                                this.manager.emit('debug', 'Error from "channel.send()" in "end()".', err, this);
+                            });
                     } else {
                         const firstEmbed = new Discord.MessageEmbed(embed).setDescription(
                             embed.description.slice(0, embed.description.indexOf('{winners}'))
@@ -809,7 +837,9 @@ class Giveaway extends EventEmitter {
                                         failIfNotExists: false
                                     }
                                 })
-                                .catch(() => {});
+                                .catch((err) => {
+                                    this.manager.emit('debug', 'Error from "channel.send()" in "end()".', err, this);
+                                });
                         }
 
                         const tempEmbed = new Discord.MessageEmbed().setColor(embed.color);
@@ -823,7 +853,9 @@ class Giveaway extends EventEmitter {
                                     ],
                                     allowedMentions: this.allowedMentions
                                 })
-                                .catch(() => {});
+                                .catch((err) => {
+                                    this.manager.emit('debug', 'Error from "channel.send()" in "end()".', err, this);
+                                });
                             formattedWinners = formattedWinners.slice(
                                 formattedWinners.slice(0, formattedWinners.lastIndexOf(',', 4095) + 2).length
                             );
@@ -833,7 +865,9 @@ class Giveaway extends EventEmitter {
                                 embeds: [tempEmbed.setDescription(formattedWinners)],
                                 allowedMentions: this.allowedMentions
                             })
-                            .catch(() => {});
+                            .catch((err) => {
+                                this.manager.emit('debug', 'Error from "channel.send()" in "end()".', err, this);
+                            });
 
                         const lastEmbed = tempEmbed.setDescription(
                             embed.description.slice(embed.description.indexOf('{winners}') + 9)
@@ -841,7 +875,9 @@ class Giveaway extends EventEmitter {
                         if (lastEmbed.length) {
                             await channel
                                 .send({ embeds: [lastEmbed], components, allowedMentions: this.allowedMentions })
-                                .catch(() => {});
+                                .catch((err) => {
+                                    this.manager.emit('debug', 'Error from "channel.send()" in "end()".', err, this);
+                                });
                         }
                     }
                 } else if (message?.length <= 2000) {
@@ -858,7 +894,9 @@ class Giveaway extends EventEmitter {
                                 failIfNotExists: false
                             }
                         })
-                        .catch(() => {});
+                        .catch((err) => {
+                            this.manager.emit('debug', 'Error from "channel.send()" in "end()".', err, this);
+                        });
                 }
             } else {
                 const embed1 = this.manager.generateNoValidParticipantsEndEmbed(this);
@@ -870,7 +908,9 @@ class Giveaway extends EventEmitter {
                             embeds: [embed1],
                             allowedMentions: this.allowedMentions
                         })
-                        .catch(() => {});
+                        .catch((err) => {
+                            this.manager.emit('debug', 'Error from "message.edit()" in "end()".', err, this);
+                        });
                 } while (
                     this.message &&
                     !embed1.equals(this.message.embeds[0]) &&
@@ -906,7 +946,9 @@ class Giveaway extends EventEmitter {
                                 failIfNotExists: false
                             }
                         })
-                        .catch(() => {});
+                        .catch((err) => {
+                            this.manager.emit('debug', 'Error from "channel.send()" in "end()".', err, this);
+                        });
                 }
             }
 
@@ -949,7 +991,9 @@ class Giveaway extends EventEmitter {
                         embeds: [embed],
                         allowedMentions: this.allowedMentions
                     })
-                    .catch(() => {});
+                    .catch((err) => {
+                        this.manager.emit('debug', 'Error from "message.edit()" in "reroll()".', err, this);
+                    });
 
                 if (!this.message || !embed.equals(this.message.embeds[0])) {
                     this.winnerIds = oldWinners;
@@ -982,7 +1026,9 @@ class Giveaway extends EventEmitter {
                                     failIfNotExists: false
                                 }
                             })
-                            .catch(() => {});
+                            .catch((err) => {
+                                this.manager.emit('debug', 'Error from "channel.send()" in "reroll()".', err, this);
+                            });
                     }
 
                     while (formattedWinners.length >= 2000) {
@@ -991,14 +1037,18 @@ class Giveaway extends EventEmitter {
                                 content: formattedWinners.slice(0, formattedWinners.lastIndexOf(',', 1999)) + ',',
                                 allowedMentions: this.allowedMentions
                             })
-                            .catch(() => {});
+                            .catch((err) => {
+                                this.manager.emit('debug', 'Error from "channel.send()" in "reroll()".', err, this);
+                            });
                         formattedWinners = formattedWinners.slice(
                             formattedWinners.slice(0, formattedWinners.lastIndexOf(',', 1999) + 2).length
                         );
                     }
                     await channel
                         .send({ content: formattedWinners, allowedMentions: this.allowedMentions })
-                        .catch(() => {});
+                        .catch((err) => {
+                            this.manager.emit('debug', 'Error from "channel.send()" in "reroll()".', err, this);
+                        });
 
                     const lastContentPart = congratMessage.slice(congratMessage.indexOf('{winners}') + 9);
                     if (lastContentPart.length) {
@@ -1011,7 +1061,9 @@ class Giveaway extends EventEmitter {
                                         : components,
                                 allowedMentions: this.allowedMentions
                             })
-                            .catch(() => {});
+                            .catch((err) => {
+                                this.manager.emit('debug', 'Error from "channel.send()" in "reroll()".', err, this);
+                            });
                     }
                 }
 
@@ -1036,7 +1088,9 @@ class Giveaway extends EventEmitter {
                                     failIfNotExists: false
                                 }
                             })
-                            .catch(() => {});
+                            .catch((err) => {
+                                this.manager.emit('debug', 'Error from "channel.send()" in "reroll()".', err, this);
+                            });
                     } else {
                         const firstEmbed = new Discord.MessageEmbed(embed).setDescription(
                             embed.description.slice(0, embed.description.indexOf('{winners}'))
@@ -1056,7 +1110,9 @@ class Giveaway extends EventEmitter {
                                         failIfNotExists: false
                                     }
                                 })
-                                .catch(() => {});
+                                .catch((err) => {
+                                    this.manager.emit('debug', 'Error from "channel.send()" in "reroll()".', err, this);
+                                });
                         }
 
                         const tempEmbed = new Discord.MessageEmbed().setColor(embed.color);
@@ -1070,7 +1126,9 @@ class Giveaway extends EventEmitter {
                                     ],
                                     allowedMentions: this.allowedMentions
                                 })
-                                .catch(() => {});
+                                .catch((err) => {
+                                    this.manager.emit('debug', 'Error from "channel.send()" in "reroll()".', err, this);
+                                });
                             formattedWinners = formattedWinners.slice(
                                 formattedWinners.slice(0, formattedWinners.lastIndexOf(',', 4095) + 2).length
                             );
@@ -1080,7 +1138,9 @@ class Giveaway extends EventEmitter {
                                 embeds: [tempEmbed.setDescription(formattedWinners)],
                                 allowedMentions: this.allowedMentions
                             })
-                            .catch(() => {});
+                            .catch((err) => {
+                                this.manager.emit('debug', 'Error from "channel.send()" in "reroll()".', err, this);
+                            });
 
                         const lastEmbed = tempEmbed.setDescription(
                             embed.description.slice(embed.description.indexOf('{winners}') + 9)
@@ -1088,7 +1148,9 @@ class Giveaway extends EventEmitter {
                         if (lastEmbed.length) {
                             await channel
                                 .send({ embeds: [lastEmbed], components, allowedMentions: this.allowedMentions })
-                                .catch(() => {});
+                                .catch((err) => {
+                                    this.manager.emit('debug', 'Error from "channel.send()" in "reroll()".', err, this);
+                                });
                         }
                     }
                 } else if (message?.length <= 2000) {
@@ -1105,7 +1167,9 @@ class Giveaway extends EventEmitter {
                                 failIfNotExists: false
                             }
                         })
-                        .catch(() => {});
+                        .catch((err) => {
+                            this.manager.emit('debug', 'Error from "channel.send()" in "reroll()".', err, this);
+                        });
                 }
                 resolve(winners);
             } else {
@@ -1125,7 +1189,9 @@ class Giveaway extends EventEmitter {
                                 failIfNotExists: false
                             }
                         })
-                        .catch(() => {});
+                        .catch((err) => {
+                            this.manager.emit('debug', 'Error from "channel.send()" in "reroll()".', err, this);
+                        });
                 }
                 resolve([]);
             }
@@ -1181,7 +1247,9 @@ class Giveaway extends EventEmitter {
                     embeds: [embed],
                     allowedMentions: this.allowedMentions
                 })
-                .catch(() => {});
+                .catch((err) => {
+                    this.manager.emit('debug', 'Error from "message.edit()" in "pause()".', err, this);
+                });
             resolve(this);
         });
     }
@@ -1217,7 +1285,9 @@ class Giveaway extends EventEmitter {
                     embeds: [embed],
                     allowedMentions: this.allowedMentions
                 })
-                .catch(() => {});
+                .catch((err) => {
+                    this.manager.emit('debug', 'Error from "message.edit()" in "unpause()".', err, this);
+                });
             resolve(this);
         });
     }

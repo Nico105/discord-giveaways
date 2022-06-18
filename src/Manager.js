@@ -56,6 +56,7 @@ class GiveawaysManager extends EventEmitter {
          */
         this.options = deepmerge(GiveawaysManagerOptions, options || {});
 
+        this.emit('debug', 'Attempting to intialize the manager...');
         if (init) this._init();
     }
 
@@ -269,11 +270,17 @@ class GiveawaysManager extends EventEmitter {
             });
 
             const embed = this.generateMainEmbed(giveaway);
-            const message = await channel.send({
-                content: giveaway.fillInString(giveaway.messages.giveaway),
-                embeds: [embed],
-                allowedMentions: giveaway.allowedMentions
-            });
+            const message = await channel
+                .send({
+                    content: giveaway.fillInString(giveaway.messages.giveaway),
+                    embeds: [embed],
+                    allowedMentions: giveaway.allowedMentions
+                })
+                .catch((err) => {
+                    this.emit('debug', 'Error from "message.send()" in "start()".', err, giveaway);
+                });
+            if (!message) return reject('Failed to send message.');
+
             giveaway.messageId = message.id;
             const reaction = await message.react(giveaway.reaction);
             giveaway.message = reaction.message;
@@ -292,7 +299,9 @@ class GiveawaysManager extends EventEmitter {
                         maxUsers: giveaway.winnerCount
                     })
                     .then(() => this.end(giveaway.messageId))
-                    .catch(() => {});
+                    .catch((err) => {
+                        this.emit('debug', 'Error from "message.awaitReactions()" in "start()".', err, giveaway);
+                    });
             }
         });
     }
@@ -388,7 +397,9 @@ class GiveawaysManager extends EventEmitter {
 
             if (!doNotDeleteMessage) {
                 giveaway.message ??= await giveaway.fetchMessage().catch(() => {});
-                giveaway.message?.delete();
+                await giveaway.message?.delete().catch((err) => {
+                    this.emit('debug', 'Error from "message.delete()" in "delete()".', err, giveaway);
+                });
             }
             this.giveaways = this.giveaways.filter((g) => g.messageId !== messageId);
             await this.deleteGiveaway(messageId);
@@ -576,14 +587,19 @@ class GiveawaysManager extends EventEmitter {
                             embeds: [embed],
                             allowedMentions: giveaway.allowedMentions
                         })
-                        .catch(() => {});
+                        .catch((err) => {
+                            this.emit('debug', 'Error from "message.edit()" in "_checkGiveaway()".', err, giveaway);
+                        });
                 }, giveaway.remainingTime - giveaway.lastChance.threshold);
             }
 
             // Fetch the message if necessary and make sure the embed is alright
             giveaway.message ??= await giveaway.fetchMessage().catch(() => {});
             if (!giveaway.message) return;
-            if (!giveaway.message.embeds[0]) await giveaway.message.suppressEmbeds(false).catch(() => {});
+            if (!giveaway.message.embeds[0])
+                await giveaway.message.suppressEmbeds(false).catch((err) => {
+                    this.emit('debug', 'Error from "message.suppressEmbeds()" in "_checkGiveaway()".', err, giveaway);
+                });
 
             // Regular case: the giveaway is not ended and we need to update it
             const lastChanceEnabled =
@@ -600,7 +616,9 @@ class GiveawaysManager extends EventEmitter {
                         embeds: [updatedEmbed],
                         allowedMentions: giveaway.allowedMentions
                     })
-                    .catch(() => {});
+                    .catch((err) => {
+                        this.emit('debug', 'Error from "message.edit()" in "_checkGiveaway()".', err, giveaway);
+                    });
             }
         });
     }
@@ -614,7 +632,7 @@ class GiveawaysManager extends EventEmitter {
         if (packet.d.user_id === this.client.user.id) return;
 
         const giveaway = this.giveaways.find((g) => g.messageId === packet.d.message_id);
-        if (!giveaway || giveaway.ended && packet.t === 'MESSAGE_REACTION_REMOVE') return;
+        if (!giveaway || (giveaway.ended && packet.t === 'MESSAGE_REACTION_REMOVE')) return;
 
         const guild =
             this.client.guilds.cache.get(packet.d.guild_id) ||
@@ -629,7 +647,7 @@ class GiveawaysManager extends EventEmitter {
 
         const message = await channel.messages.fetch(packet.d.message_id).catch(() => {});
         if (!message) return;
-        
+
         const emoji = Discord.Util.resolvePartialEmoji(giveaway.reaction);
         const reaction = message.reactions.cache.find((r) =>
             [r.emoji.name, r.emoji.id].filter(Boolean).includes(emoji?.id ?? emoji?.name)
@@ -675,6 +693,7 @@ class GiveawaysManager extends EventEmitter {
             rawGiveaways = rawGiveaways.filter(
                 (g) => shardId === Discord.ShardClientUtil.shardIdForGuildId(g.guildId, this.client.shard.count)
             );
+            this.emit('debug', `Shard #${shardId} has received ${rawGiveaways.length} giveaways.`);
         }
 
         rawGiveaways.forEach((giveaway) => this.giveaways.push(new Giveaway(this, giveaway)));
@@ -683,6 +702,7 @@ class GiveawaysManager extends EventEmitter {
             if (this.client.readyAt) this._checkGiveaway.call(this);
         }, this.options.forceUpdateEvery || DEFAULT_CHECK_INTERVAL);
         this.ready = true;
+        this.emit('debug', 'Manager became ready.');
 
         // Delete data of ended giveaways
         if (Number.isFinite(this.options.endedGiveawaysLifetime)) {
@@ -693,11 +713,24 @@ class GiveawaysManager extends EventEmitter {
                 (g) => !endedGiveaways.map((giveaway) => giveaway.messageId).includes(g.messageId)
             );
             for (const giveaway of endedGiveaways) await this.deleteGiveaway(giveaway.messageId);
+            this.emit('debug', `Deleted ${endedGiveaways.length} ended giveaways.`);
         }
 
         this.client.on('raw', (packet) => this._handleRawPacket(packet));
     }
 }
+
+/**
+ * Emitted when a giveaway ended.
+ * @event GiveawaysManager#debug
+ * @param {string} info Info about a current event or the cause and location of an error.
+ * @param {?Discord.DiscordAPIError} error The error object, if any.
+ * @param {?Giveaway} giveaway The giveaway instance, if any.
+ *
+ * @example
+ * manager.on('debug', (info, error, giveaway) => {
+ * });
+ */
 
 /**
  * Emitted when a giveaway ended.
