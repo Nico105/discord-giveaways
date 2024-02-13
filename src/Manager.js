@@ -330,7 +330,7 @@ class GiveawaysManager extends EventEmitter {
             } else {
                 const collector = giveaway.message.createMessageComponentCollector({
                     filter: async (interaction) =>
-                        interaction.customId === giveaway.buttons.join.customId &&
+                        interaction.customId === giveaway.buttons.join.data.custom_id &&
                         (await giveaway.checkWinnerEntry(interaction.user)),
                     componentType: Discord.ComponentType.Button
                 });
@@ -732,7 +732,7 @@ class GiveawaysManager extends EventEmitter {
                     .catch(() => {});
             };
 
-            if (giveaway.buttons.join.customId === interaction.customId) {
+            if (giveaway.buttons.join.data.custom_id === interaction.customId) {
                 // If only one button is used, remove the user if he has already joined
                 if (!giveaway.buttons.leave && giveaway.entrantIds.includes(interaction.member.id)) {
                     const index = giveaway.entrantIds.indexOf(interaction.member.id);
@@ -755,7 +755,7 @@ class GiveawaysManager extends EventEmitter {
                     await checkForDropEnd(giveaway);
                 }
             } else if (
-                giveaway.buttons.leave?.customId === interaction.customId &&
+                giveaway.buttons.leave?.data.custom_id === interaction.customId &&
                 giveaway.entrantIds.includes(interaction.member.id)
             ) {
                 const index = giveaway.entrantIds.indexOf(interaction.member.id);
