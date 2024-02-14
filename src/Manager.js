@@ -636,25 +636,10 @@ class GiveawaysManager extends EventEmitter {
             const lastChanceEnabled =
                 giveaway.lastChance.enabled && giveaway.remainingTime < giveaway.lastChance.threshold;
             const updatedEmbed = this.generateMainEmbed(giveaway, lastChanceEnabled);
-            const updatedButtons = giveaway.buttons
-                ? giveaway.fillInComponents([
-                      { components: [giveaway.buttons.join, giveaway.buttons.leave].filter(Boolean) }
-                  ])
-                : null;
 
             const needUpdate =
                 !embedEqual(giveaway.message.embeds[0].data, updatedEmbed.data) ||
-                giveaway.message.content !== giveaway.fillInString(giveaway.messages.giveaway) ||
-                (giveaway.buttons &&
-                    (!buttonEqual(
-                        updatedButtons[0].components[0].data,
-                        giveaway.message.components[0].components[0].data
-                    ) ||
-                        (giveaway.buttons.leave &&
-                            !buttonEqual(
-                                updatedButtons[0].components[1].data,
-                                giveaway.message.components[0].components[1].data
-                            ))));
+                giveaway.message.content !== giveaway.fillInString(giveaway.messages.giveaway);
 
             if (needUpdate || this.options.forceUpdateEvery) {
                 await giveaway.message
@@ -662,7 +647,6 @@ class GiveawaysManager extends EventEmitter {
                         content: giveaway.fillInString(giveaway.messages.giveaway),
                         embeds: [updatedEmbed],
                         allowedMentions: giveaway.allowedMentions,
-                        components: updatedButtons ?? undefined
                     })
                     .catch(() => {});
             }
