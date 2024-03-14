@@ -731,7 +731,7 @@ class GiveawaysManager extends EventEmitter {
 
                 giveaway.entrantIds.push(interaction.member.id);
 
-                if (giveaway.buttons.joinReply) await replyToInteraction(giveaway.buttons.joinReply);
+                if (giveaway.buttons.joinReply && !giveaway.extraData) await replyToInteraction(giveaway.buttons.joinReply);
 
                 this.emit(Events.GiveawayMemberJoined, giveaway, interaction.member, interaction);
 
