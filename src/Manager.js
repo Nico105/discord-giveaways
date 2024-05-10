@@ -34,13 +34,6 @@ class GiveawaysManager extends EventEmitter {
     constructor(client, options, init = true) {
         super();
         if (!client?.options) throw new Error(`Client is a required option. (val=${client})`);
-        if (
-            !new Discord.IntentsBitField(client.options.intents).has(
-                Discord.IntentsBitField.Flags.GuildMessageReactions
-            )
-        ) {
-            throw new Error('Client is missing the "GuildMessageReactions" intent.');
-        }
 
         /**
          * The Discord Client
@@ -330,7 +323,7 @@ class GiveawaysManager extends EventEmitter {
             } else {
                 const collector = giveaway.message.createMessageComponentCollector({
                     filter: async (interaction) =>
-                        interaction.customId === giveaway.buttons.join.customId &&
+                        interaction.customId === giveaway.buttons.join.data.custom_id &&
                         (await giveaway.checkWinnerEntry(interaction.user)),
                     componentType: Discord.ComponentType.Button
                 });
@@ -636,25 +629,10 @@ class GiveawaysManager extends EventEmitter {
             const lastChanceEnabled =
                 giveaway.lastChance.enabled && giveaway.remainingTime < giveaway.lastChance.threshold;
             const updatedEmbed = this.generateMainEmbed(giveaway, lastChanceEnabled);
-            const updatedButtons = giveaway.buttons
-                ? giveaway.fillInComponents([
-                      { components: [giveaway.buttons.join, giveaway.buttons.leave].filter(Boolean) }
-                  ])
-                : null;
 
             const needUpdate =
                 !embedEqual(giveaway.message.embeds[0].data, updatedEmbed.data) ||
-                giveaway.message.content !== giveaway.fillInString(giveaway.messages.giveaway) ||
-                (giveaway.buttons &&
-                    (!buttonEqual(
-                        updatedButtons[0].components[0].data,
-                        giveaway.message.components[0].components[0].data
-                    ) ||
-                        (giveaway.buttons.leave &&
-                            !buttonEqual(
-                                updatedButtons[0].components[1].data,
-                                giveaway.message.components[0].components[1].data
-                            ))));
+                giveaway.message.content !== giveaway.fillInString(giveaway.messages.giveaway);
 
             if (needUpdate || this.options.forceUpdateEvery) {
                 await giveaway.message
@@ -662,7 +640,6 @@ class GiveawaysManager extends EventEmitter {
                         content: giveaway.fillInString(giveaway.messages.giveaway),
                         embeds: [updatedEmbed],
                         allowedMentions: giveaway.allowedMentions,
-                        components: updatedButtons ?? undefined
                     })
                     .catch(() => {});
             }
@@ -732,7 +709,7 @@ class GiveawaysManager extends EventEmitter {
                     .catch(() => {});
             };
 
-            if (giveaway.buttons.join.customId === interaction.customId) {
+            if (giveaway.buttons.join.data.custom_id === interaction.customId) {
                 // If only one button is used, remove the user if he has already joined
                 if (!giveaway.buttons.leave && giveaway.entrantIds.includes(interaction.member.id)) {
                     const index = giveaway.entrantIds.indexOf(interaction.member.id);
@@ -747,7 +724,7 @@ class GiveawaysManager extends EventEmitter {
 
                 giveaway.entrantIds.push(interaction.member.id);
 
-                if (giveaway.buttons.joinReply) await replyToInteraction(giveaway.buttons.joinReply);
+                if (giveaway.buttons.joinReply && !giveaway.extraData) await replyToInteraction(giveaway.buttons.joinReply);
 
                 this.emit(Events.GiveawayMemberJoined, giveaway, interaction.member, interaction);
 
@@ -755,7 +732,7 @@ class GiveawaysManager extends EventEmitter {
                     await checkForDropEnd(giveaway);
                 }
             } else if (
-                giveaway.buttons.leave?.customId === interaction.customId &&
+                giveaway.buttons.leave?.data.custom_id === interaction.customId &&
                 giveaway.entrantIds.includes(interaction.member.id)
             ) {
                 const index = giveaway.entrantIds.indexOf(interaction.member.id);
